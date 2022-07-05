@@ -7,6 +7,8 @@
 // https://github.com/bitbank2/JPEGDEC/blob/master/examples/M5Stack/M5StickCPlus/M5StickCPlus.ino
 #include "SegmentBlock.h"
 #include "Motion.h"
+#include <string>
+using namespace std;
 
 #define JPEG_READER_IMAGE_TYPE    EIGHT_BIT_GRAYSCALE
 #define JPEG_READER_IMAGE_SIZE    JPEG_SCALE_QUARTER
@@ -21,6 +23,7 @@ public:
 //protected:
   //virtual int callback(JPEGDRAW *pDraw);
   static SegmentBlock *segmentBlock;
+  string clusterInfo = "";
 private:
   //static SegmentBlock *segmentBlock;
   Motion *motion;

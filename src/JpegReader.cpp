@@ -34,6 +34,7 @@ void JpegReader::loop(uint8_t *buffer, size_t size) {
       //Serial.println("this->jpeg.decode");
       yield();
       this->motion->loop(JpegReader::segmentBlock);
+      this->clusterInfo = this->motion->clusterInfo;
       //Serial.println("this->motion->loop done");
     }
     this->jpeg.close();

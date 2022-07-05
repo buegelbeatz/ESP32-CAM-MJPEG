@@ -1,0 +1,154 @@
+@startuml
+
+'skinparam Padding 5
+
+participant main #99FF99
+participant setup #99FF99
+participant loop #99FF99
+
+note over main, loop : arduino framework
+
+
+participant connection [
+    =connection
+    ----
+    Wifi setup
+    connect to existing network
+    or start access point
+]
+
+participant ota [
+    =ota
+    ----
+    Over the air updates
+]
+
+participant jpegReader [
+    =jpegReader
+    ----
+    Reads jpeg-stream
+    from esp32-cam
+]
+
+participant server [
+    =server
+    ----
+    HTTP-Server
+]
+
+participant streamingClients [
+    =streamingClients
+    ----
+    Queue of all currently
+    connected clients
+]
+
+participant mjpegCB [
+    =mjpegCB (RTOS)
+    ----
+    RTOS task for taking care
+    of incoming requests
+]
+
+participant camCB [
+    =camCB (RTOS)
+    ----
+    RTOS task for grabbing
+    frames from the camera
+]
+
+participant camera #9999FF
+
+participant streamCB [
+    =streamCB (RTOS)
+    ----
+    RTOS task to push the stream
+    to all connected clients
+]
+
+
+participant client
+
+== init ==
+
+main -> setup : run once
+activate setup
+note left of setup
+serial
+connection
+ota
+jpegReader
+cam
+end note
+create connection
+setup -> connection
+create ota
+setup -> ota
+create jpegReader
+setup -> jpegReader
+create mjpegCB
+setup -> mjpegCB : Create RTOS task
+deactivate setup
+activate mjpegCB
+create streamingClients
+mjpegCB -> streamingClients : Create client Queue
+create camCB
+
+mjpegCB -> camCB : Create RTOS task
+create streamCB
+mjpegCB -> streamCB : Create RTOS task
+
+create server
+mjpegCB -> server : init - GET /mjpeg/1
+activate server
+
+
+== idle ==
+
+mjpegCB -> server : handle client requests
+server -> mjpegCB : endless loop
+deactivate mjpegCB
+main -> loop : vTaskDelay 1000
+activate loop
+loop -> ota : check for updates
+activate ota
+deactivate ota
+deactivate loop
+
+== request ==
+
+
+client -> server : GET http://<camera-server>/mjpeg/1
+activate client
+server -> client : sending multipart header
+server -> streamingClients : add to client list
+server -> streamCB : reactivate
+activate streamCB
+server -> camCB : reactivate
+activate camCB
+camCB -> streamCB ++ #993333 : Block streaming if camera refresh is active
+camCB -> camera : load picture from camera
+activate camera
+camera -> camCB : using 2 buffers for images
+deactivate camera
+
+'camCB -> streamCB : Allow streaming again
+camCB -> jpegReader : stream image to motion handler
+activate jpegReader
+note left of jpegReader
+fill grid
+check for motion
+build rectangles
+end note
+jpegReader -> camCB : set motion cluster coordinates
+deactivate jpegReader
+return unblock
+streamCB -> streamingClients : get active client
+streamingClients -> streamCB : still connected
+streamCB -> camCB ++ #993333 : Block frame update if sending is active
+streamCB -> client : send cluster motion information header
+streamCB -> client : send jpeg buffer as buffer frame
+streamCB -> streamingClients : add client again to the Queue
+' streamCB -> camCB -- : Allow to refresh camera frame again
+return unblock
+@enduml

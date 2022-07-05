@@ -1,5 +1,4 @@
 #include "OV2640.h"
-
 #define TAG "OV2640"
 
 // definitions appropriate for the ESP32-CAM devboard (and most clones)

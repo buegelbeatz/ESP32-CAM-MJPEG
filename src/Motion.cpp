@@ -1,4 +1,5 @@
 #include "Motion.h"
+#include "JpegReader.h"
 
 void Motion::analyzeSegment(size_t x, size_t y, size_t dx, size_t dy, int number = 1) {
   if (this->markedBlock->get(x, y) == 0) {
@@ -42,12 +43,12 @@ Motion::Motion() {
 }
 
 void Motion::loop(SegmentBlock *analyzeBlock) {
-  // Serial.println("Motion::loop");
   this->currentBlock->clone(analyzeBlock);
-  // Serial.println("Motion::loop analyzeBlock cloned");
   delete this->markedBlock;
   this->markedBlock = new SegmentBlock();
   if (this->initialized) {
+    this->clusterCount = 0;
+    this->clusterInfo = "";
     for (size_t y = 0; y < SEGMENT_BLOCK_HEIGHT; ++y)
       for (size_t x = 0; x < SEGMENT_BLOCK_WIDTH; ++x) {
         yield();
@@ -57,16 +58,6 @@ void Motion::loop(SegmentBlock *analyzeBlock) {
         this->analyzeSegment(SEGMENT_BLOCK_WIDTH - x - 1,
                              SEGMENT_BLOCK_HEIGHT - y - 1, -1, -1, 4);
       }
-    // size_t motionMax = (SEGMENT_BLOCK_WIDTH * SEGMENT_BLOCK_HEIGHT) / 2;
-    // size_t motionCount = 0;
-    // for (size_t y = 0; y < SEGMENT_BLOCK_HEIGHT; ++y)
-    //   for (size_t x = 0; x < SEGMENT_BLOCK_WIDTH; ++x)
-    //     if(this->markedBlock->get(x, y) > 0L)
-    //       ++motionCount;
-    // if(motionCount > motionMax){
-    //   Serial.println("too much motion");
-    //   return;
-    // }
     for (size_t y = 0; y < SEGMENT_BLOCK_HEIGHT - 3; ++y)
       for (size_t x = 0; x < SEGMENT_BLOCK_WIDTH - 3; ++x) {
         if (this->markedBlock->get(x, y) > 0 &&
@@ -88,22 +79,18 @@ void Motion::loop(SegmentBlock *analyzeBlock) {
               }
             }
             if (dy > 2 && dy < (SEGMENT_BLOCK_HEIGHT / 3)) {
-              Serial.print("x=");
-              Serial.print(x);
-              Serial.print(", y=");
-              Serial.print(y);
-              Serial.print(", dx=");
-              Serial.print(dx);
-              Serial.print(", dy=");
-              Serial.println(dy);
+              if(this->clusterCount <= MOTION_CLUSTER_MAX){
+                this->clusterInfo += to_string(x * this->currentBlock->imageWidth * JPEG_READER_IMAGE_DIVIDER / SEGMENT_BLOCK_WIDTH) + "," +
+                to_string(y * this->currentBlock->imageHeight * JPEG_READER_IMAGE_DIVIDER / SEGMENT_BLOCK_HEIGHT) + "," +
+                to_string(dx * this->currentBlock->imageWidth * JPEG_READER_IMAGE_DIVIDER / SEGMENT_BLOCK_WIDTH) + "," +
+                to_string(dy * this->currentBlock->imageHeight * JPEG_READER_IMAGE_DIVIDER / SEGMENT_BLOCK_HEIGHT) + ";";
+                this->clusterCount += 1;
+              }
             }
           }
         }
       }
   }
   this->backupBlock->clone(analyzeBlock);
-  // this->backupBlock->serialHeatPrint();
-  //this->markedBlock->serialPrint();
-  // Serial.println("Motion::loop backupBlock cloned");
   this->initialized = 1;
 }
