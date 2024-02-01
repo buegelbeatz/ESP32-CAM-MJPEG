@@ -7,7 +7,7 @@ Connection::Connection() {}
 Connection::~Connection() {}
 
 int Connection::loop() {
-  if (WiFi.status() == WL_CONNECTED || this->apStatus == 1) {
+  if (WiFi.status() == WL_CONNECTED) {
     return 1;
   } else {
     return 0;
@@ -16,18 +16,6 @@ int Connection::loop() {
 
 void Connection::setup() {
   Serial.println("Setup Connection...");
-  IPAddress staticIp, gatewayIp, subnetMask, dnsServer1, dnsServer2;
-  staticIp.fromString(this->ip);
-  gatewayIp.fromString(this->gateway);
-  subnetMask.fromString(this->subnet);
-  dnsServer1.fromString(this->dns1);
-  dnsServer2.fromString(this->dns2);
-  WiFi.disconnect();
-  delay(100);
-  if (WiFi.config(staticIp, gatewayIp, subnetMask, dnsServer1, dnsServer2) ==
-      false) {
-    Serial.println("Configuration failed.");
-  } else {
     WiFi.mode(WIFI_STA);
     WiFi.hostname(this->hostname);
     WiFi.begin(this->ssid, this->password);
@@ -38,21 +26,13 @@ void Connection::setup() {
       delay(100);
     }
     if (WiFi.status() == WL_CONNECTED) {
-      Serial.print("http://");
-      Serial.print(staticIp);
-      Serial.println("/");
+      IPAddress ip = WiFi.localIP();
+      Serial.print("\nWiFi connected with IP ");
+      Serial.println(ip);
     } else {
-      Serial.println("Switch to AP-Mode...");
-      WiFi.persistent(false);
-      WiFi.setAutoConnect(false);
-      WiFi.disconnect(true);
-      WiFi.mode(WIFI_AP);
-      delay(1000);
-      WiFi.softAP(this->hostname, this->password);
-      Serial.print("http://");
-      Serial.print(WiFi.softAPIP());
-      Serial.println("/");
-      this->apStatus = 1;
+      Serial.println("Restart device...");
+      delay(100);
+      WiFi.disconnect();
+      esp_restart();
     }
-  }
 }
