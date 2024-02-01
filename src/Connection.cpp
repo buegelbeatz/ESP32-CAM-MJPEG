@@ -22,6 +22,8 @@ void Connection::setup() {
   subnetMask.fromString(this->subnet);
   dnsServer1.fromString(this->dns1);
   dnsServer2.fromString(this->dns2);
+  WiFi.disconnect();
+  delay(100);
   if (WiFi.config(staticIp, gatewayIp, subnetMask, dnsServer1, dnsServer2) ==
       false) {
     Serial.println("Configuration failed.");

@@ -23,6 +23,8 @@ done
 echo "CURRENT_ENV=$CURRENT_ENV"
 echo "CURRENT_HOST=$CURRENT_HOST"
 
+echo "flags $PLATFORMIO_BUILD_FLAGS"
+
 if [ "$use_usb" == "" ];then
   CURRENT_ENV="$CURRENT_ENV" \
   CURRENT_HOST="$CURRENT_HOST" \
@@ -31,6 +33,7 @@ if [ "$use_usb" == "" ];then
     PLATFORMIO_SRC_DIR="$PLATFORMIO_SRC_DIR" \
     pio run   -e "$current_env" -t upload
 else
+	
   CURRENT_ENV="$CURRENT_ENV" \
   CURRENT_HOST="$CURRENT_HOST" \
   PLATFORMIO_BUILD_FLAGS="$PLATFORMIO_BUILD_FLAGS" \
