@@ -6,11 +6,12 @@
 #define PRO_CPU 0
 
 #include "Connection.h"
-#include "JpegReader.h"
+//#include "JpegReader.h"
 
-// #include <ArduinoOTA.h>
+#include <ArduinoOTA.h>
 #include <WebServer.h>
 #include <WiFi.h>
+//#include <WiFiNINA.h>
 #include <WiFiClient.h>
 
 #include <driver/rtc_io.h>
@@ -32,7 +33,7 @@ using namespace std;
 //#include "home_wifi_multi.h"
 
 Connection *connection;
-JpegReader *jpegReader;
+//JpegReader *jpegReader;
 OV2640 cam;
 WebServer server(80);
 
@@ -51,10 +52,10 @@ SemaphoreHandle_t frameSync = NULL;
 QueueHandle_t streamingClients;
 
 // We will try to achieve 25 FPS frame rate
-const int FPS = 14;
+const int FPS = 25;
 
 // We will handle web client requests every 50 ms (20 Hz)
-const int WSINTERVAL = 100;
+const int WSINTERVAL = 50;
 
 // Commonly used variables:
 volatile size_t camSize; // size of the current frame, byte
@@ -67,8 +68,8 @@ const char HEADER[] = "HTTP/1.1 200 OK\r\n"
                       "boundary=123456789000000000000987654321\r\n";
 const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";
 const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
-const char CLUSTERINFO[] = "X-Motion-Cluster: ";
-const int clusterLen = strlen(CLUSTERINFO);
+//const char CLUSTERINFO[] = "X-Motion-Cluster: ";
+//const int clusterLen = strlen(CLUSTERINFO);
 const int hdrLen = strlen(HEADER);
 const int bdrLen = strlen(BOUNDARY);
 const int cntLen = strlen(CTNTTYPE);
@@ -107,7 +108,6 @@ void handleJPGSstream(void) {
 // ========================
 void streamCB(void *pvParameters) {
   char buf[16];
-  char cluster[128];
   TickType_t xLastWakeTime;
   TickType_t xFrequency;
 
@@ -145,16 +145,6 @@ void streamCB(void *pvParameters) {
         //  are serving this frame
         xSemaphoreTake(frameSync, portMAX_DELAY);
 
-        if (jpegReader->clusterInfo != "") {
-          client->write(CLUSTERINFO, clusterLen);
-          sprintf(cluster, "%s\r\n", jpegReader->clusterInfo.c_str());
-          client->write(cluster, strlen(cluster));
-
-          // Serial.print("ESP.getFreeHeap()");Serial.println(ESP.getFreeHeap());
-          // Serial.print("ESP.getHeapFragmentation()");Serial.println(ESP.getHeapFragmentation());
-          // Serial.print("ESP.getMaxFreeBlockSize()");Serial.println(ESP.getMaxFreeBlockSize());
-        }
-
         client->write(CTNTTYPE, cntLen);
         sprintf(buf, "%d\r\n\r\n", camSize);
         client->write(buf, strlen(buf));
@@ -184,14 +174,14 @@ void streamCB(void *pvParameters) {
 }
 
 // ==== Serve up one JPEG frame =============================================
-// void handleJPG(void){
-//   WiFiClient client = server.client();
-//
-//   if (!client.connected()) return;
-//   cam.run();
-//   client.write(JHEADER, jhdLen);
-//   client.write((char*)cam.getfb(), cam.getSize());
-// }
+void handleJPG(void){
+  WiFiClient client = server.client();
+
+  if (!client.connected()) return;
+  cam.run();
+  client.write(JHEADER, jhdLen);
+  client.write((char*)cam.getfb(), cam.getSize());
+}
 
 // ==== Handle invalid URL requests ============================================
 void handleNotFound() {
@@ -296,7 +286,7 @@ void camCB(void *pvParameters) {
     ifb &= 1; // this should produce 1, 0, 1, 0, 1 ... sequence
     portEXIT_CRITICAL(&xSemaphore);
 
-    jpegReader->loop((uint8_t *)camBuf, camSize);
+    //jpegReader->loop((uint8_t *)camBuf, camSize);
 
     //  Let anyone waiting for a frame know that the frame is ready
     xSemaphoreGive(frameSync);
@@ -328,7 +318,7 @@ void mjpegCB(void *pvParameters) {
   xSemaphoreGive(frameSync);
 
   // Creating a queue to track all connected clients
-  streamingClients = xQueueCreate(10, sizeof(WiFiClient *));
+  streamingClients = xQueueCreate(8, sizeof(WiFiClient *));
 
   //=== setup section  ==================
 
@@ -348,7 +338,7 @@ void mjpegCB(void *pvParameters) {
 
   //  Registering webserver handling routines
   server.on("/mjpeg/1", HTTP_GET, handleJPGSstream);
-  // server.on("/jpg", HTTP_GET, handleJPG);
+  server.on("/jpg", HTTP_GET, handleJPG);
   server.onNotFound(handleNotFound);
 
   //  Starting webserver
@@ -377,42 +367,44 @@ void setup() {
   connection = new Connection();
   connection->setup();
 
-  // ArduinoOTA.setPassword(STR(OTA_PASSWORD));
+  Serial.println("OTA setup:");
+  Serial.print("IP: ");Serial.println(WiFi.localIP());
+  Serial.print("Host: ");Serial.println(STR(DEVICE_NAME));
+  Serial.print("Password: ");Serial.println(STR(OTA_PASSWORD));
 
-  // ArduinoOTA
-  //     .onStart([]() {
-  //       String type;
-  //       if (ArduinoOTA.getCommand() == U_FLASH)
-  //         type = "sketch";
-  //       else // U_SPIFFS
-  //         type = "filesystem";
+  //ArduinoOTA.begin(WiFi.localIP(), STR(DEVICE_NAME), STR(OTA_PASSWORD), InternalStorage);
 
-  //       // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS
-  //       // using SPIFFS.end()
-  //       Serial.println("Start updating " + type);
-  //     })
-  //     .onEnd([]() { Serial.println("\nEnd"); })
-  //     .onProgress([](unsigned int progress, unsigned int total) {
-  //       Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  //     })
-  //     .onError([](ota_error_t error) {
-  //       Serial.printf("Error[%u]: ", error);
-  //       if (error == OTA_AUTH_ERROR)
-  //         Serial.println("Auth Failed");
-  //       else if (error == OTA_BEGIN_ERROR)
-  //         Serial.println("Begin Failed");
-  //       else if (error == OTA_CONNECT_ERROR)
-  //         Serial.println("Connect Failed");
-  //       else if (error == OTA_RECEIVE_ERROR)
-  //         Serial.println("Receive Failed");
-  //       else if (error == OTA_END_ERROR)
-  //         Serial.println("End Failed");
-  //     });
+  ArduinoOTA.setHostname(STR(DEVICE_NAME));
+  ArduinoOTA.setPassword(STR(OTA_PASSWORD));
+  ArduinoOTA
+    .onStart([]() {
+      String type;
+      if (ArduinoOTA.getCommand() == U_FLASH)
+        type = "sketch";
+      else // U_SPIFFS
+        type = "filesystem";
 
-  // ArduinoOTA.begin();
+      // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
+      Serial.println("Start updating " + type);
+    })
+    .onEnd([]() {
+      Serial.println("\nEnd");
+    })
+    .onProgress([](unsigned int progress, unsigned int total) {
+      Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+    })
+    .onError([](ota_error_t error) {
+      Serial.printf("Error[%u]: ", error);
+      if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+      else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+      else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+      else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+      else if (error == OTA_END_ERROR) Serial.println("End Failed");
+    });
+  ArduinoOTA.begin();
 
-  jpegReader = new JpegReader();
-  jpegReader->setup();
+  //ArduinoOTA.begin(WiFi.localIP(), STR(DEVICE_NAME), STR(OTA_PASSWORD), InternalStorage);
+  // https://github.com/SensorsIot/ESP32-OTA/blob/master/0TA_Template_Sketch/OTA.h
 
   // Configure the camera
   camera_config_t config;
@@ -440,18 +432,18 @@ void setup() {
 
   // Frame parameters: pick one
   // config.frame_size = FRAMESIZE_UXGA;
-  config.frame_size = FRAMESIZE_SXGA;
+  // config.frame_size = FRAMESIZE_SXGA;
   //  config.frame_size = FRAMESIZE_QVGA;
-  // config.frame_size = FRAMESIZE_SVGA;
-  config.jpeg_quality = 12;
+  config.frame_size = FRAMESIZE_SVGA;
+  config.jpeg_quality = 14;
   config.fb_count = 2;
 
-// #if defined(CAMERA_MODEL_AI_THINKER)
-//   digitalWrite(PWDN_GPIO_NUM, LOW);
-//   delay(10);
-//   digitalWrite(PWDN_GPIO_NUM, HIGH);
-//   delay(10);
-// #endif
+#if defined(CAMERA_MODEL_AI_THINKER)
+  digitalWrite(PWDN_GPIO_NUM, LOW);
+  delay(10);
+  digitalWrite(PWDN_GPIO_NUM, HIGH);
+  delay(10);
+#endif
 
 #if defined(CAMERA_MODEL_ESP_EYE)
   pinMode(13, INPUT_PULLUP);
@@ -460,7 +452,7 @@ void setup() {
 
   if (cam.init(config) != ESP_OK) {
     Serial.println("Error initializing the camera");
-    delay(10000);
+    delay(1000);
     ESP.restart();
   }
 
@@ -470,12 +462,15 @@ void setup() {
 }
 
 void loop() {
-  //vTaskDelay(1000);
-  //ArduinoOTA.handle();
   if (connection->loop() == 0) {
-    delay(10000);
+    delay(3000);
+    connection->setup();
     if (connection->loop() == 0) {
       ESP.restart();
     }
   }
+  //ArduinoOTA.poll();
+  ArduinoOTA.handle();
+  vTaskDelay(1000);
+  //ArduinoOTA.poll();
 }

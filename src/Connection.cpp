@@ -16,6 +16,15 @@ int Connection::loop() {
 
 void Connection::setup() {
   Serial.println("Setup Connection...");
+  IPAddress staticIp, gatewayIp, subnetMask, dnsServer1, dnsServer2;
+  staticIp.fromString(this->ip);
+  gatewayIp.fromString(this->gateway);
+  subnetMask.fromString(this->subnet);
+  dnsServer1.fromString(this->dns1);
+  dnsServer2.fromString(this->dns2);
+  if (WiFi.config(staticIp, gatewayIp, subnetMask, dnsServer1, dnsServer2) == false) {
+    Serial.println("Configuration failed.");
+  } else {
     WiFi.mode(WIFI_STA);
     WiFi.hostname(this->hostname);
     WiFi.begin(this->ssid, this->password);
@@ -26,13 +35,9 @@ void Connection::setup() {
       delay(100);
     }
     if (WiFi.status() == WL_CONNECTED) {
-      IPAddress ip = WiFi.localIP();
-      Serial.print("\nWiFi connected with IP ");
-      Serial.println(ip);
-    } else {
-      Serial.println("Restart device...");
-      delay(100);
-      WiFi.disconnect();
-      esp_restart();
+      Serial.print("http://");
+      Serial.print(staticIp);
+      Serial.println("/");
     }
+  }
 }

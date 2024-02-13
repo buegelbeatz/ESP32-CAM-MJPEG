@@ -190,6 +190,7 @@ esp_err_t OV2640::init(camera_config_t config)
     sensor_t *s = esp_camera_sensor_get();
     s->set_hmirror(s, 1);        // 0 = disable , 1 = enable
     s->set_vflip(s, 1);          // 0 = disable , 1 = enable
-
+    s->set_contrast(s, 2);       // -2 to 2
+    s->set_saturation(s, -2);     // -2 to 2
     return ESP_OK;
 }
