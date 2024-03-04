@@ -8,4 +8,4 @@ if [ "$speed" == "" ];then
  speed=115200
 fi
 
-pio device monitor  -b $speed
+pio device monitor  -b $speed # --port 192.168.2.22:3232 

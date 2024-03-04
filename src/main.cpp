@@ -6,12 +6,10 @@
 #define PRO_CPU 0
 
 #include "Connection.h"
-//#include "JpegReader.h"
 
 #include <ArduinoOTA.h>
 #include <WebServer.h>
 #include <WiFi.h>
-//#include <WiFiNINA.h>
 #include <WiFiClient.h>
 
 #include <driver/rtc_io.h>
@@ -29,11 +27,14 @@
 #include "camera_pins.h"
 #include "OV2640.h"
 #include <string>
+
+#include <chrono>
+
 using namespace std;
-//#include "home_wifi_multi.h"
+
+std::chrono::time_point<std::chrono::system_clock> global_timestamp;
 
 Connection *connection;
-//JpegReader *jpegReader;
 OV2640 cam;
 WebServer server(80);
 
@@ -124,6 +125,9 @@ void streamCB(void *pvParameters) {
     //  Only bother to send anything if there is someone watching
     UBaseType_t activeClients = uxQueueMessagesWaiting(streamingClients);
     if (activeClients) {
+
+      global_timestamp = std::chrono::system_clock::now();
+
       // Adjust the period to the number of connected clients
       xFrequency /= activeClients;
 
@@ -166,6 +170,13 @@ void streamCB(void *pvParameters) {
       //  Since there are no connected clients, there is no reason to waste
       //  battery running
       vTaskSuspend(NULL);
+      auto now = std::chrono::system_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::minutes>(now - global_timestamp);
+
+      if (duration.count() > 3) {
+        Serial.println("no connected client since 2min...");
+        ESP.restart();
+      }
     }
     //  Let other tasks run after serving every client
     taskYIELD();
@@ -366,6 +377,15 @@ void setup() {
 
   connection = new Connection();
   connection->setup();
+  // esp_wifi_set_max_tx_power(80);
+
+  // Set external antenna
+  //esp_wifi_set_ant(ESP_WIFI_ANT_EXT); // Activate external antenna
+
+  // Set maximum TX power
+  //esp_wifi_set_max_tx_power(20); // Set TX power to maximum (20 dBm)
+
+  global_timestamp = std::chrono::system_clock::now();
 
   Serial.println("OTA setup:");
   Serial.print("IP: ");Serial.println(WiFi.localIP());
@@ -434,7 +454,7 @@ void setup() {
   // config.frame_size = FRAMESIZE_UXGA;
   // config.frame_size = FRAMESIZE_SXGA;
   //  config.frame_size = FRAMESIZE_QVGA;
-  config.frame_size = FRAMESIZE_SVGA;
+  config.frame_size = FRAMESIZE_QVGA;
   config.jpeg_quality = 14;
   config.fb_count = 2;
 
